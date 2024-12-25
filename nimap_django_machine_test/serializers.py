@@ -14,12 +14,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = '__all__'
 class CustomProjectSerializer(serializers.ModelSerializer):
     # Define the fields you want to include in the response
+    client_name = serializers.CharField(source='client.client_name', read_only=True)  # Fetch the client name from the related Client model
     created_by = serializers.CharField(source='created_by.username', read_only=True)  # Assuming created_by is a ForeignKey to User
     created_at = serializers.DateTimeField(format='%Y-%m-%dT%H:%M:%S%z', read_only=True)  # Format to ISO 8601
 
     class Meta:
         model = Project
-        fields = ['id', 'project_name', 'created_at','created_by'] 
+        fields = ['id', 'project_name','client_name', 'created_at','created_by'] 
 class ClientSerializer(serializers.ModelSerializer):
     # projects = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
     

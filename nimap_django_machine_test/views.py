@@ -5,6 +5,8 @@ from .models import Client, Project
 from .serializers import *
 from rest_framework import generics
 from django.utils import timezone
+from django.http import JsonResponse
+
 
 class ClientViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all()
@@ -101,20 +103,33 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def create(self, request, client_pk=None):
         user = request.user.id  # Get the logged-in user's ID
-        
+        client_id = request.data.get('client_id')
+        error=[]
+        if not client_id:
+            error.append('Client ID is required')
+            return Response({"detail": "Client ID is required."}, status=status.HTTP_400_BAD_REQUEST)
         # Retrieve the client using the client_pk provided in the URL
         try:
-            client = Client.objects.get(id=client_pk)
+            client = Client.objects.get(id=client_id)
         except Client.DoesNotExist:
-            return Response({"detail": "Client not found."}, status=status.HTTP_404_NOT_FOUND)
+            error.append('Client does not exist')
+            return Response({"detail": "Client not found..."}, status=status.HTTP_404_NOT_FOUND)
         
+        user1_ids = User.objects.values_list('id', flat=True)  # This will give a list of all user IDs
+        if user not in user1_ids:
+            error.append('User is not authorized')
+            return Response({"detail": "User Not Found ..."}, status=status.HTTP_404_NOT_FOUND)
         # Get the project name and users from the request data
         project_name = request.data.get('project_name')
         users_data = request.data.get('users', [])
         if not users_data:
+            error.append("At least one user is required.")
             return Response({"detail": "At least one user is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create the new project and associate it with the client and the logged-in user
+        if error:
+            return JsonResponse({"detailss": " ".join(error)}, status=status.HTTP_400_BAD_REQUEST)
+        
         project = Project.objects.create(
             project_name=project_name,
             client=client,
@@ -122,13 +137,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         )
 
         # Add users to the project
+        
         for user_data in users_data:
             try:
                 # Assuming user_data has 'id' and 'name' for matching the user
-                user = User.objects.get(id=user_data['id'], username=user_data['name'])
+                user = User.objects.get(id=user_data)
                 project.users.add(user)
             except User.DoesNotExist:
-                return Response({"detail": f"User with ID {user_data['id']} and name {user_data['name']} not found."}, status=status.HTTP_404_NOT_FOUND)
+                # error.append(f"User {user_data} does not exist")
+                return Response({"detail": f"User with ID {user_data} not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Save the project after adding users
         project.save()
